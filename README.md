@@ -1,8 +1,8 @@
 # opcClient
 
-The openopc package leaks memories and is not suitable for long term running situation.
+*Memory leak* occurs when the original OpenOPC package connects to an OPC DA server (WinCC etc.) and SyncRead or SyncWrite some tags.
 
-This package is used to fix that problem. It should run on old windows boxes to collect PLC data in WinCC OPC DA Server.
+It is a serious problem, especially in plant situation. This project is aimed to solve it, and provide a windows native DLL for Python, so as to leverage advantages of both programming languages. The final software should run on old windows boxes to collect PLC data in WinCC OPC DA Server.
 
-Test enviroment is WinCC7.0 and Windows7 x86 sp1.  
+Test enviroment is assumed as WinCC7.0 and Windows7 x86 sp1.  
 
