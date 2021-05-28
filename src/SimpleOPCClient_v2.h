@@ -110,4 +110,33 @@ void ReadItems(IUnknown* pGroupIUnknown, TH(&hSvrItems)[CN], VARIANT(& varValue)
 	pIOPCSyncIO->Release();
 }
 
+///////////////////////////////////////////////////////////////////////////////
+// Write the value of the item having the "hServerItem" server 
+// handle and belonging to the group whose one interface is pointed by
+// pGroupIUnknown. The value is put in varValue. 
+//
+template<typename TH, size_t CN>
+void WriteItems(IUnknown* pGroupIUnknown, TH(&hSvrItems)[CN], VARIANT(& varValue)[CN])
+{
+
+	//get a pointer to the IOPCSyncIOInterface:
+	IOPCSyncIO* pIOPCSyncIO;
+	pGroupIUnknown->QueryInterface(__uuidof(pIOPCSyncIO), (void**) &pIOPCSyncIO);
+
+	// read the item value from the device:
+	HRESULT* pErrors = NULL; //to store error code(s)
+	HRESULT hr = pIOPCSyncIO->Write(CN, hSvrItems, varValue, &pErrors);
+
+	_ASSERT(!hr);
+
+
+
+	//Release memeory allocated by the OPC server:
+	CoTaskMemFree(pErrors);
+	pErrors = NULL;
+
+	// release the reference to the IOPCSyncIO interface:
+	pIOPCSyncIO->Release();
+}
+
 #endif // SIMPLE_OPC_CLIENT_H not defined

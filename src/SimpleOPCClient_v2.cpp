@@ -17,8 +17,6 @@
 
 #include "include/opcda.h"
 #include "include/opcda_i.c"
-#include "include/opccomn_i.c"  // OPC Common interface IDs
-#include "include/OpcEnum_i.c"
 #include "SimpleOPCClient_v2.h"
 
 using namespace std;
@@ -32,17 +30,65 @@ using namespace std;
 
 //#define REMOTE_SERVER_NAME L"your_path"
 
+void TestSingleRW() {
+	IOPCServer* pIOPCServer = NULL;   //pointer to IOPServer interface
+	IOPCItemMgt* pIOPCItemMgt = NULL; //pointer to IOPCItemMgt interface
+
+	OPCHANDLE hServerGroup; // server handle to the group
+	OPCHANDLE hServerItem;  // server handle to the item
+	
+
+	// have to be done before using microsoft COM library:
+	CoInitialize(NULL);
+
+	// Let's instantiante the IOPCServer interface and get a pointer of it:
+	pIOPCServer = InstantiateServer(OPC_SERVER_NAME);
+
+	// Add the OPC group the OPC server and get an handle to the IOPCItemMgt
+	//interface:
+	AddTheGroup(pIOPCServer, pIOPCItemMgt, hServerGroup);
+
+	// Add the OPC item
+    AddTheItem(pIOPCItemMgt, hServerItem);
+
+	////Read the value of the item from device:
+	VARIANT varValue; //to stor the read value
+	VariantInit(&varValue);
+	
+	while(TRUE) {
+		ReadItem(pIOPCItemMgt, hServerItem, varValue);
+		// print the read value:
+		cout << "Read value: " << varValue.XVAL << endl;
+		if(varValue.XVAL != 0) 
+			varValue.fltVal = 0;
+		else
+			varValue.fltVal = -1;
+		WriteItem(pIOPCItemMgt, hServerItem, varValue);
+	}
+	// Remove the OPC item:
+	RemoveItem(pIOPCItemMgt, hServerItem);
+
+	// Remove the OPC group: 
+    RemoveGroup(pIOPCServer, hServerGroup);
+
+	// release the interface references:
+	pIOPCItemMgt->Release();
+	pIOPCServer->Release();
+
+	//close the COM library:
+	CoUninitialize();
+}
+
 //////////////////////////////////////////////////////////////////////
 // Read the value of an item on an OPC server. 
 //
-void main(void)
-{
+void TestMultiRW() {
+
 	IOPCServer* pIOPCServer = NULL;   //pointer to IOPServer interface
 	IOPCItemMgt* pIOPCItemMgt = NULL; //pointer to IOPCItemMgt interface
 
 	OPCHANDLE hServerGroup; // server handle to the group
 	//OPCHANDLE hServerItem;  // server handle to the item
-	
 	
 
 	// have to be done before using microsoft COM library:
@@ -104,25 +150,14 @@ void main(void)
 		cout << "(I07: " << varValue[0].XVAL 
 			 << " I02: " << varValue[1].XVAL 
 			 << " Q01: " << varValue[2].XVAL << endl;
+		if(varValue[0].XVAL != 0) 
+			varValue[0].fltVal = 0;
+		else
+			varValue[0].fltVal = -1;
+		WriteItems(pIOPCItemMgt, hServerItems, varValue);
 	}
 	
 	RemoveItems(pIOPCItemMgt, hServerItems);
-	////Read the value of the item from device:
-	//VARIANT varValue; //to stor the read value
-	//VariantInit(&varValue);
-	//
-	//while(TRUE) {
-	//	//ReadItem(pIOPCItemMgt, hServerItem, varValue);
-	//	// print the read value:
-	//	cout << "Read value: " << varValue.XVAL << endl;
-	//	if(varValue.XVAL != 0) 
-	//		varValue.fltVal = 0;
-	//	else
-	//		varValue.fltVal = -1;
-	//	WriteItem(pIOPCItemMgt, hServerItem, varValue);
-	//}
-	//// Remove the OPC item:
-	//RemoveItem(pIOPCItemMgt, hServerItem);
 
 	// Remove the OPC group: 
     RemoveGroup(pIOPCServer, hServerGroup);
@@ -133,6 +168,12 @@ void main(void)
 
 	//close the COM library:
 	CoUninitialize();
+}
+
+void main(void)
+{
+	//TestSingleRW();
+	TestMultiRW();
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -266,6 +307,7 @@ void ReadItem(IUnknown* pGroupIUnknown, OPCHANDLE hServerItem, VARIANT& varValue
 	_ASSERT(pValue!=NULL);
 
 	varValue = pValue[0].vDataValue;
+	VariantClear(&pValue[0].vDataValue);
 
 	//Release memeory allocated by the OPC server:
 	CoTaskMemFree(pErrors);
