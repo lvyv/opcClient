@@ -25,6 +25,7 @@ void WriteItem(IUnknown* pGroupIUnknown, OPCHANDLE hServerItem, VARIANT& varValu
 void RemoveItem(IOPCItemMgt* pIOPCItemMgt, OPCHANDLE hServerItem);
 void RemoveGroup (IOPCServer* pIOPCServer, OPCHANDLE hServerGroup);
 
+
 //////////////////////////////////////////////////////////////////
 // Add the Item ITEM_ID to the group whose IOPCItemMgt interface
 // is pointed by pIOPCItemMgt pointer. Return a server opc handle
@@ -45,9 +46,10 @@ void AddItems(IOPCItemMgt* pIOPCItemMgt, TH(&hSvrItems)[CN], OPCITEMDEF (&ItemAr
 	// Server handle for the added item:
 	for(LONG ii = 0; ii < CN; ii++) {
 		hSvrItems[ii] = pAddResult[ii].hServer;
+		// release memory allocated by the server:
+		CoTaskMemFree(pAddResult[ii].pBlob);	
 	}
-	// release memory allocated by the server:
-	CoTaskMemFree(pAddResult->pBlob);
+
 
 	CoTaskMemFree(pAddResult);
 	pAddResult = NULL;

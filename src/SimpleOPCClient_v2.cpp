@@ -28,7 +28,72 @@ using namespace std;
 #define VT VT_R4
 #define XVAL fltVal
 
-//#define REMOTE_SERVER_NAME L"your_path"
+
+
+
+void SimpleRW() {
+	// have to be done before using microsoft COM library:
+	CoInitialize(NULL);
+	IUnknown *pUnknown = NULL;	
+	
+	IOPCServer* pIOPCServer = NULL;   //pointer to IOPServer interface
+	IOPCItemMgt* pIOPCItemMgt = NULL; //pointer to IOPCItemMgt interface
+
+	OPCHANDLE hServerGroup; // server handle to the group
+	OPCHANDLE hServerItem;  // server handle to the item
+	
+
+
+	// Let's instantiante the IOPCServer interface and get a pointer of it:
+	pIOPCServer = InstantiateServer(OPC_SERVER_NAME);
+
+	//// Create an instance of the Certificate Enrollment object.
+	//CLSID CLSID_OPCServer;
+	//HRESULT hr;
+
+	//// get the CLSID from the OPC Server Name:
+	//hr = CLSIDFromString(OPC_SERVER_NAME, &CLSID_OPCServer);
+	//_ASSERT(!FAILED(hr));
+
+	//hr = CoCreateInstance(CLSID_OPCServer, NULL, CLSCTX_SERVER, IID_IUnknown, reinterpret_cast<void**>(&pUnknown));
+	//hr = pUnknown->QueryInterface(IID_IOPCServer, reinterpret_cast<void**>(&pIOPCServer));
+	//// Check status.
+	//if ( FAILED( hr ) )
+	//{
+	//	printf("Failed CoCreateInstance - pEnroll [%x]\n", hr);
+	//	goto error;
+	//}
+	// Add the OPC group the OPC server and get an handle to the IOPCItemMgt
+	//interface:
+	AddTheGroup(pIOPCServer, pIOPCItemMgt, hServerGroup);
+	// Add the OPC item
+    AddTheItem(pIOPCItemMgt, hServerItem);
+	//Read the value of the item from device:
+	VARIANT varValue; //to stor the read value
+	VariantInit(&varValue);
+	ReadItem(pIOPCItemMgt, hServerItem, varValue);
+	// print the read value:
+	cout << "Read value: " << varValue.XVAL << endl;
+	if(varValue.XVAL != 0) 
+		varValue.fltVal = 0;
+	else
+		varValue.fltVal = -1;
+	WriteItem(pIOPCItemMgt, hServerItem, varValue);
+	VariantClear(&varValue);
+	// Remove the OPC item:
+	RemoveItem(pIOPCItemMgt, hServerItem);
+	// Remove the OPC group: 
+    RemoveGroup(pIOPCServer, hServerGroup);
+	// release the interface references:
+	pIOPCItemMgt->Release();
+
+
+	//pUnknown->Release();
+	pIOPCServer->Release();
+	//close the COM library:
+	CoUninitialize();
+}
+
 
 void TestSingleRW() {
 	IOPCServer* pIOPCServer = NULL;   //pointer to IOPServer interface
@@ -173,7 +238,10 @@ void TestMultiRW() {
 void main(void)
 {
 	//TestSingleRW();
-	TestMultiRW();
+	//TestMultiRW();
+	while(true) {
+		SimpleRW();
+	}
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -205,14 +273,18 @@ IOPCServer* InstantiateServer(wchar_t ServerName[])
 	//	/*COAUTHINFO*/  NULL,
 	//	/*dwReserved2*/ 0
     //}; 
-
-	// create an instance of the IOPCServer
-	hr = CoCreateInstanceEx(CLSID_OPCServer, NULL, CLSCTX_SERVER,
-		/*&CoServerInfo*/NULL, cmq, queue);
+	IUnknown *pUnknown = NULL;	
+	IOPCServer* pIOPCSvr = NULL;
+	hr = CoCreateInstance(CLSID_OPCServer, NULL, CLSCTX_SERVER, IID_IUnknown, reinterpret_cast<void**>(&pUnknown));
+	hr = pUnknown->QueryInterface(IID_IOPCServer, reinterpret_cast<void**>(&pIOPCSvr));
+	
+	//// create an instance of the IOPCServer
+	//hr = CoCreateInstanceEx(CLSID_OPCServer, NULL, CLSCTX_SERVER,
+	//	/*&CoServerInfo*/NULL, cmq, queue);
 	_ASSERT(!hr);
-
+	pUnknown->Release();
 	// return a pointer to the IOPCServer interface:
-	return(IOPCServer*) queue[0].pItf;
+	return pIOPCSvr;
 }
 
 
@@ -227,6 +299,8 @@ void AddTheGroup(IOPCServer* pIOPCServer, IOPCItemMgt* &pIOPCItemMgt,
 {
 	DWORD dwUpdateRate = 0;
 	OPCHANDLE hClientGroup = 0;
+	
+	
 
 	// Add an OPC group and get a pointer to the IUnknown I/F:
     HRESULT hr = pIOPCServer->AddGroup(/*szName*/ L"CASIC_WINCC_RW_GRP",
@@ -240,6 +314,7 @@ void AddTheGroup(IOPCServer* pIOPCServer, IOPCItemMgt* &pIOPCItemMgt,
 		&dwUpdateRate,
 		/*riid*/ IID_IOPCItemMgt,
 		/*ppUnk*/ (IUnknown**) &pIOPCItemMgt);
+	
 	_ASSERT(!FAILED(hr));
 }
 
@@ -277,7 +352,7 @@ void AddTheItem(IOPCItemMgt* pIOPCItemMgt, OPCHANDLE& hServerItem)
 	hServerItem = pAddResult[0].hServer;
 
 	// release memory allocated by the server:
-	CoTaskMemFree(pAddResult->pBlob);
+	CoTaskMemFree(pAddResult[0].pBlob);//->pBlob);
 
 	CoTaskMemFree(pAddResult);
 	pAddResult = NULL;
@@ -308,6 +383,7 @@ void ReadItem(IUnknown* pGroupIUnknown, OPCHANDLE hServerItem, VARIANT& varValue
 
 	varValue = pValue[0].vDataValue;
 	VariantClear(&pValue[0].vDataValue);
+	CoTaskMemFree(&pValue[0].ftTimeStamp);
 
 	//Release memeory allocated by the OPC server:
 	CoTaskMemFree(pErrors);
@@ -318,6 +394,7 @@ void ReadItem(IUnknown* pGroupIUnknown, OPCHANDLE hServerItem, VARIANT& varValue
 
 	// release the reference to the IOPCSyncIO interface:
 	pIOPCSyncIO->Release();
+	pIOPCSyncIO = NULL;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -346,6 +423,7 @@ void WriteItem(IUnknown* pGroupIUnknown, OPCHANDLE hServerItem, VARIANT& varValu
 
 	// release the reference to the IOPCSyncIO interface:
 	pIOPCSyncIO->Release();
+	pIOPCSyncIO = NULL;
 }
 
 ///////////////////////////////////////////////////////////////////////////
