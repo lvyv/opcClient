@@ -29,3 +29,9 @@ DLL_EXPORT int __stdcall one_turn_rw()
     SimpleRW();
 	return 0;
 }
+
+DLL_EXPORT int __stdcall init_tags()
+{
+    SimpleRW();
+	return 0;
+}

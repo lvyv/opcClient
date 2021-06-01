@@ -12,8 +12,11 @@
 // https://github.com/lvyv/opcClient
 
 #include <atlbase.h>
+#include <comutil.h>
+
 #include <objbase.h>
 #include <iostream>
+#include <string>
 
 #include "include/opcda.h"
 #include "include/opcda_i.c"
@@ -24,9 +27,9 @@ using namespace std;
 //#define OPC_SERVER_NAME L"OPC.Evaluation:HV supply.1" // e.g.: L"OPC.Evaluation:HV supply.1"
 #define OPC_SERVER_NAME L"OPCServer.WinCC.1"	
 //#define ITEM_ID L"cr02.ch00.V0"
-#define ITEM_ID L"213_BTN_I07"
-#define VT VT_R4
-#define XVAL fltVal
+#define ITEM_ID L"DB2strB"
+#define VT VT_BSTR
+#define XVAL bstrVal
 
 
 
@@ -34,7 +37,6 @@ using namespace std;
 void SimpleRW() {
 	// have to be done before using microsoft COM library:
 	CoInitialize(NULL);
-	IUnknown *pUnknown = NULL;	
 	
 	IOPCServer* pIOPCServer = NULL;   //pointer to IOPServer interface
 	IOPCItemMgt* pIOPCItemMgt = NULL; //pointer to IOPCItemMgt interface
@@ -42,44 +44,28 @@ void SimpleRW() {
 	OPCHANDLE hServerGroup; // server handle to the group
 	OPCHANDLE hServerItem;  // server handle to the item
 	
-
-
-	// Let's instantiante the IOPCServer interface and get a pointer of it:
 	pIOPCServer = InstantiateServer(OPC_SERVER_NAME);
 
-	//// Create an instance of the Certificate Enrollment object.
-	//CLSID CLSID_OPCServer;
-	//HRESULT hr;
-
-	//// get the CLSID from the OPC Server Name:
-	//hr = CLSIDFromString(OPC_SERVER_NAME, &CLSID_OPCServer);
-	//_ASSERT(!FAILED(hr));
-
-	//hr = CoCreateInstance(CLSID_OPCServer, NULL, CLSCTX_SERVER, IID_IUnknown, reinterpret_cast<void**>(&pUnknown));
-	//hr = pUnknown->QueryInterface(IID_IOPCServer, reinterpret_cast<void**>(&pIOPCServer));
-	//// Check status.
-	//if ( FAILED( hr ) )
-	//{
-	//	printf("Failed CoCreateInstance - pEnroll [%x]\n", hr);
-	//	goto error;
-	//}
-	// Add the OPC group the OPC server and get an handle to the IOPCItemMgt
-	//interface:
 	AddTheGroup(pIOPCServer, pIOPCItemMgt, hServerGroup);
 	// Add the OPC item
     AddTheItem(pIOPCItemMgt, hServerItem);
+	
 	//Read the value of the item from device:
 	VARIANT varValue; //to stor the read value
 	VariantInit(&varValue);
 	ReadItem(pIOPCItemMgt, hServerItem, varValue);
 	// print the read value:
-	cout << "Read value: " << varValue.XVAL << endl;
-	if(varValue.XVAL != 0) 
-		varValue.fltVal = 0;
-	else
-		varValue.fltVal = -1;
-	WriteItem(pIOPCItemMgt, hServerItem, varValue);
+	const std::string stdstr(_bstr_t(varValue.bstrVal, true));
+	cout << "Read value: " << stdstr << endl;
+	//if(varValue.XVAL != 0) 
+	//	varValue.fltVal = 0;
+	//else
+	//	varValue.fltVal = -1;
+	//WriteItem(pIOPCItemMgt, hServerItem, varValue);
+	//CoTaskMemFree(&(varValue.bstrVal));//how to free?
+	SysFreeString(varValue.bstrVal);
 	VariantClear(&varValue);
+	
 	// Remove the OPC item:
 	RemoveItem(pIOPCItemMgt, hServerItem);
 	// Remove the OPC group: 
@@ -88,11 +74,13 @@ void SimpleRW() {
 	pIOPCItemMgt->Release();
 
 
-	//pUnknown->Release();
 	pIOPCServer->Release();
-	//close the COM library:
 	CoUninitialize();
 }
+
+
+
+
 
 
 void TestSingleRW() {
@@ -235,6 +223,99 @@ void TestMultiRW() {
 	CoUninitialize();
 }
 
+
+//////////////////////////////////////////////////////////////////////
+// Read the value of an item on an OPC server. 
+//
+void InitGroup(OPCITEMDEF (&Items)[3]) {
+
+	IOPCServer* pIOPCServer = NULL;   //pointer to IOPServer interface
+	IOPCItemMgt* pIOPCItemMgt = NULL; //pointer to IOPCItemMgt interface
+
+	OPCHANDLE hServerGroup; // server handle to the group
+	//OPCHANDLE hServerItem;  // server handle to the item
+	
+
+	// have to be done before using microsoft COM library:
+	CoInitialize(NULL);
+
+	// Let's instantiante the IOPCServer interface and get a pointer of it:
+	pIOPCServer = InstantiateServer(OPC_SERVER_NAME);
+
+	// Add the OPC group the OPC server and get an handle to the IOPCItemMgt
+	//interface:
+	AddTheGroup(pIOPCServer, pIOPCItemMgt, hServerGroup);
+
+	// Add the OPC item
+    // AddTheItem(pIOPCItemMgt, hServerItem);
+
+	//// Add the OPC items
+	//// Array of items to add:
+	//OPCITEMDEF Items[3] =
+	//{{
+	///*szAccessPath*/ L"",
+	///*szItemID*/ L"213_BTN_I07",
+	///*bActive*/ FALSE,
+	///*hClient*/ 1,
+	///*dwBlobSize*/ 0,
+	///*pBlob*/ NULL,
+	///*vtRequestedDataType*/ VT_R4,
+	///*wReserved*/0
+	//},{
+	//	L"",
+	//	L"213_BTN_I02",
+	//	FALSE,
+	//	2,
+	//	0,
+	//	NULL,
+	//	VT_R4,
+	//	0
+	//},{
+	//	L"",
+	//	L"213_LED_Q01",
+	//	FALSE,
+	//	2,
+	//	0,
+	//	NULL,
+	//	VT_R4,
+	//	0
+	//}};
+	
+	OPCHANDLE hServerItems[3];	// server handle array
+
+	AddItems(pIOPCItemMgt, hServerItems, Items);
+
+	VARIANT varValue[3];
+	for(LONG ii = 0; ii < 3; ii++) {
+		VariantInit(&varValue[ii]);
+	}
+
+	while(TRUE) {
+		ReadItems(pIOPCItemMgt, hServerItems, varValue);
+		cout << "(I07: " << varValue[0].XVAL 
+			 << " I02: " << varValue[1].XVAL 
+			 << " Q01: " << varValue[2].XVAL << endl;
+		if(varValue[0].XVAL != 0) 
+			varValue[0].fltVal = 0;
+		else
+			varValue[0].fltVal = -1;
+		WriteItems(pIOPCItemMgt, hServerItems, varValue);
+	}
+	
+	RemoveItems(pIOPCItemMgt, hServerItems);
+
+	// Remove the OPC group: 
+    RemoveGroup(pIOPCServer, hServerGroup);
+
+	// release the interface references:
+	pIOPCItemMgt->Release();
+	pIOPCServer->Release();
+
+	//close the COM library:
+	CoUninitialize();
+}
+
+
 void main(void)
 {
 	//TestSingleRW();
@@ -257,33 +338,11 @@ IOPCServer* InstantiateServer(wchar_t ServerName[])
 	hr = CLSIDFromString(ServerName, &CLSID_OPCServer);
 	_ASSERT(!FAILED(hr));
 
-
-	//queue of the class instances to create
-	LONG cmq = 1; // nbr of class instance to create.
-	MULTI_QI queue[1] =
-		{{&IID_IOPCServer,
-		NULL,
-		0}};
-
-	//Server info:
-	//COSERVERINFO CoServerInfo =
-    //{
-	//	/*dwReserved1*/ 0,
-	//	/*pwszName*/ REMOTE_SERVER_NAME,
-	//	/*COAUTHINFO*/  NULL,
-	//	/*dwReserved2*/ 0
-    //}; 
-	IUnknown *pUnknown = NULL;	
 	IOPCServer* pIOPCSvr = NULL;
-	hr = CoCreateInstance(CLSID_OPCServer, NULL, CLSCTX_SERVER, IID_IUnknown, reinterpret_cast<void**>(&pUnknown));
-	hr = pUnknown->QueryInterface(IID_IOPCServer, reinterpret_cast<void**>(&pIOPCSvr));
-	
-	//// create an instance of the IOPCServer
-	//hr = CoCreateInstanceEx(CLSID_OPCServer, NULL, CLSCTX_SERVER,
-	//	/*&CoServerInfo*/NULL, cmq, queue);
+	hr = CoCreateInstance(CLSID_OPCServer, NULL, CLSCTX_SERVER, IID_IOPCServer, reinterpret_cast<void**>(&pIOPCSvr));
 	_ASSERT(!hr);
-	pUnknown->Release();
-	// return a pointer to the IOPCServer interface:
+
+
 	return pIOPCSvr;
 }
 
@@ -384,6 +443,7 @@ void ReadItem(IUnknown* pGroupIUnknown, OPCHANDLE hServerItem, VARIANT& varValue
 	varValue = pValue[0].vDataValue;
 	VariantClear(&pValue[0].vDataValue);
 	CoTaskMemFree(&pValue[0].ftTimeStamp);
+
 
 	//Release memeory allocated by the OPC server:
 	CoTaskMemFree(pErrors);
