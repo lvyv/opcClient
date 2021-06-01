@@ -442,7 +442,7 @@ void ReadItem(IUnknown* pGroupIUnknown, OPCHANDLE hServerItem, VARIANT& varValue
 
 	varValue = pValue[0].vDataValue;
 	VariantClear(&pValue[0].vDataValue);
-	CoTaskMemFree(&pValue[0].ftTimeStamp);
+	//CoTaskMemFree(&pValue[0].ftTimeStamp);
 
 
 	//Release memeory allocated by the OPC server:
